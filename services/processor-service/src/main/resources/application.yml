@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: processor-service
+
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/gaming_ai}
+    username: ${POSTGRES_USER:gaming}
+    password: ${POSTGRES_PASSWORD:gaming}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+
+    admin:
+      auto-create: true
+
+    consumer:
+      group-id: gaming-intelligence-processor
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.json.trusted.packages: "*"
+
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+  endpoint:
+    health:
+      show-details: always
