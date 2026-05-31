@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 
 public interface AlertRepository extends JpaRepository<AlertEntity, Long> {
 
@@ -17,13 +18,15 @@ public interface AlertRepository extends JpaRepository<AlertEntity, Long> {
 
     boolean existsByGid(String gid);
 
-    List<AlertEntity> findBySeverityIgnoreCaseOrderByCreatedAtDesc(String severity);
-
     List<AlertEntity> findTop20ByOrderByCreatedAtDesc();
 
     List<AlertEntity> findByOrderByCreatedAtDesc(Pageable pageable);
 
     List<AlertEntity> findBySeverityIgnoreCaseOrderByCreatedAtDesc(String severity, Pageable pageable);
+
+    List<AlertEntity> findBySeverityInIgnoreCaseOrderByCreatedAtDesc(
+            Collection<String> severities,
+            Pageable pageable);
 
     long countBySeverityIgnoreCase(String severity);
 }

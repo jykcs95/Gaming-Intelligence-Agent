@@ -34,7 +34,21 @@ public class AlertQueryService {
     }
 
     public List<AlertResponse> getAlertsBySeverity(String severity) {
-        return alertRepository.findBySeverityIgnoreCaseOrderByCreatedAtDesc(severity)
+        Pageable pageable = PageRequest.of(0, 100);
+
+        return alertRepository.findBySeverityIgnoreCaseOrderByCreatedAtDesc(severity, pageable)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<AlertResponse> getHighPriorityAlerts(int limit) {
+        int safeLimit = Math.clamp(limit, 1, 100);
+        Pageable pageable = PageRequest.of(0, safeLimit);
+
+        return alertRepository.findBySeverityInIgnoreCaseOrderByCreatedAtDesc(
+                List.of("critical", "high"),
+                pageable)
                 .stream()
                 .map(this::toResponse)
                 .toList();

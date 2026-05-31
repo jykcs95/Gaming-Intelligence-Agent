@@ -30,6 +30,12 @@ public class AlertController {
         return ResponseEntity.ok(alertQueryService.getAlertSummary());
     }
 
+    @GetMapping("/high-priority")
+    public ResponseEntity<List<AlertResponse>> getHighPriorityAlerts(
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(alertQueryService.getHighPriorityAlerts(limit));
+    }
+
     @GetMapping("/severity/{severity}")
     public ResponseEntity<List<AlertResponse>> getAlertsBySeverity(@PathVariable String severity) {
         return ResponseEntity.ok(alertQueryService.getAlertsBySeverity(severity));
