@@ -1,6 +1,7 @@
 package com.gamingintel.processor_service.controller;
 
 import com.gamingintel.processor_service.dto.AlertResponse;
+import com.gamingintel.processor_service.dto.AlertSummaryResponse;
 import com.gamingintel.processor_service.service.AlertQueryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +23,11 @@ public class AlertController {
             @RequestParam(required = false) String severity,
             @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(alertQueryService.getAlerts(severity, limit));
+    }
+
+    @GetMapping("/summary")
+    public ResponseEntity<AlertSummaryResponse> getAlertSummary() {
+        return ResponseEntity.ok(alertQueryService.getAlertSummary());
     }
 
     @GetMapping("/severity/{severity}")

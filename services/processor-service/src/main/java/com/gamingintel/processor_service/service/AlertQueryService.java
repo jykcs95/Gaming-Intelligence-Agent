@@ -1,6 +1,7 @@
 package com.gamingintel.processor_service.service;
 
 import com.gamingintel.processor_service.dto.AlertResponse;
+import com.gamingintel.processor_service.dto.AlertSummaryResponse;
 import com.gamingintel.processor_service.entity.AlertEntity;
 import com.gamingintel.processor_service.exception.AlertNotFoundException;
 import com.gamingintel.processor_service.repository.AlertRepository;
@@ -70,5 +71,15 @@ public class AlertQueryService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public AlertSummaryResponse getAlertSummary() {
+        return AlertSummaryResponse.builder()
+                .totalAlerts(alertRepository.count())
+                .criticalCount(alertRepository.countBySeverityIgnoreCase("critical"))
+                .highCount(alertRepository.countBySeverityIgnoreCase("high"))
+                .mediumCount(alertRepository.countBySeverityIgnoreCase("medium"))
+                .lowCount(alertRepository.countBySeverityIgnoreCase("low"))
+                .build();
     }
 }

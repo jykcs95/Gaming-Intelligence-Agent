@@ -24,4 +24,6 @@ public interface AlertRepository extends JpaRepository<AlertEntity, Long> {
     List<AlertEntity> findByOrderByCreatedAtDesc(Pageable pageable);
 
     List<AlertEntity> findBySeverityIgnoreCaseOrderByCreatedAtDesc(String severity, Pageable pageable);
+
+    long countBySeverityIgnoreCase(String severity);
 }
