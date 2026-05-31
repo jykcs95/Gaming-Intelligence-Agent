@@ -38,7 +38,10 @@ public class OllamaClientService {
         Map<String, Object> requestBody = Map.of(
                 "model", this.model,
                 "prompt", prompt,
-                "stream", false);
+                "stream", false,
+                "format", "json",
+                "options", Map.of(
+                        "temperature", 0));
 
         log.info("Calling Ollama model={}", model);
 
@@ -48,7 +51,7 @@ public class OllamaClientService {
                 .retrieve()
                 .body(String.class);
 
-        log.info("Received raw Ollama response for gid={}", message.getGid());
+        log.info("Received raw Ollama response for gid={} response={}", message.getGid(), response);
 
         return extractResponse(response);
     }
@@ -57,29 +60,29 @@ public class OllamaClientService {
         return """
                 You are a gaming intelligence analyst.
 
-                Analyze this Steam update and return only a valid JSON object with exactly these fields:
+                Analyze this Steam update. Return ONLY one valid JSON object. Do not write any natural language before or after it. Do not apologize. Do not explain.:
                 {
-                "summary": "short summary of the update",
-                "sentiment": "positive, neutral, or negative",
-                "confidence": 0.0,
-                "importance_score": 1,
-                "update_type": "patch",
-                "key_points": [
-                    "short key point 1",
-                    "short key point 2"
-                ]
+                    "summary": "short summary of the update",
+                    "sentiment": "positive, neutral, or negative",
+                    "confidence": 0.0,
+                    "importanceScore": 1,
+                    "updateType": "patch",
+                    "keyPoints": "short key point 1; short key point 2"
                 }
 
                 Rules:
                 - sentiment must be one of: positive, neutral, negative
                 - confidence must be a number from 0.0 to 1.0
-                - importance_score must be an integer from 1 to 10
-                - update_type must be one of:
-                patch, event, announcement, balance_change, dlc, sale, bug_fix, security, unknown
-                - key_points must be a JSON array of short strings
+                - importanceScore must be an integer from 1 to 10
+                - updateType must be one of:
+                    patch, event, announcement, balance_change, dlc, sale, bug_fix, security, unknown
+                - keyPoints must be a semicolon-separated string, not an array
                 - Return only valid JSON
                 - Do not include markdown
                 - Do not include explanation outside the JSON
+                - The first character of your response must be {
+                - The last character of your response must be }
+                - If the update mentions security, exploit, vulnerability, account safety, cheating, or player safety, updateType must be security and importanceScore must be at least 8.
 
                 Steam update:
                 App ID: %s
@@ -88,12 +91,13 @@ public class OllamaClientService {
                 URL: %s
                 Contents:
                 %s
-                """.formatted(
-                message.getAppId(),
-                message.getTitle(),
-                message.getAuthor(),
-                message.getUrl(),
-                message.getContents());
+                """
+                .formatted(
+                        message.getAppId(),
+                        message.getTitle(),
+                        message.getAuthor(),
+                        message.getUrl(),
+                        message.getContents());
     }
 
     private String extractResponse(String rawResponse) {

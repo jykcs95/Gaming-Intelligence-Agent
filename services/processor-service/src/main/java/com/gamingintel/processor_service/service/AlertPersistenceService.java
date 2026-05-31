@@ -7,6 +7,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+
+import java.util.Locale;
 import java.time.Instant;
 
 @Service
@@ -15,9 +19,17 @@ public class AlertPersistenceService {
     private static final Logger log = LoggerFactory.getLogger(AlertPersistenceService.class);
 
     private final AlertRepository alertRepository;
+    private final MeterRegistry meterRegistry;
+    private final Counter alertsGeneratedCounter;
 
-    public AlertPersistenceService(AlertRepository alertRepository) {
+    public AlertPersistenceService(
+            AlertRepository alertRepository,
+            MeterRegistry meterRegistry) {
         this.alertRepository = alertRepository;
+        this.meterRegistry = meterRegistry;
+        this.alertsGeneratedCounter = Counter.builder("alerts_generated_total")
+                .description("Total number of alerts generated and persisted")
+                .register(meterRegistry);
     }
 
     public AlertEntity save(AlertMessage alertMessage) {
@@ -51,6 +63,14 @@ public class AlertPersistenceService {
 
         AlertEntity saved = alertRepository.save(entity);
 
+        alertsGeneratedCounter.increment();
+
+        Counter.builder("alerts_generated_by_severity_total")
+                .description("Total number of alerts generated and persisted by severity")
+                .tag("severity", normalizeSeverity(saved.getSeverity()))
+                .register(meterRegistry)
+                .increment();
+
         log.info(
                 "Saved alert to database id={} gid={} alertId={}",
                 saved.getId(),
@@ -66,5 +86,13 @@ public class AlertPersistenceService {
         }
 
         return Instant.parse(createdAt);
+    }
+
+    private String normalizeSeverity(String severity) {
+        if (severity == null || severity.isBlank()) {
+            return "unknown";
+        }
+
+        return severity.trim().toLowerCase(Locale.ROOT);
     }
 }
