@@ -13,7 +13,7 @@ public class TopicInitializerConfig {
 
     @Bean
     public NewTopic rawUpdatesTopic() {
-        return TopicBuilder.name("raw_updates")
+        return TopicBuilder.name(KafkaTopics.RAW_UPDATES)
                 .partitions(PARTITIONS)
                 .replicas(REPLICAS)
                 .build();
@@ -21,7 +21,7 @@ public class TopicInitializerConfig {
 
     @Bean
     public NewTopic rawUpdatesDlqTopic() {
-        return TopicBuilder.name("raw_updates_dlq")
+        return TopicBuilder.name(KafkaTopics.RAW_UPDATES_DLQ)
                 .partitions(PARTITIONS)
                 .replicas(REPLICAS)
                 .build();
@@ -29,7 +29,7 @@ public class TopicInitializerConfig {
 
     @Bean
     public NewTopic processedUpdatesTopic() {
-        return TopicBuilder.name("processed_updates")
+        return TopicBuilder.name(KafkaTopics.PROCESSED_UPDATES)
                 .partitions(PARTITIONS)
                 .replicas(REPLICAS)
                 .build();
@@ -37,7 +37,7 @@ public class TopicInitializerConfig {
 
     @Bean
     public NewTopic aiAnalysisTopic() {
-        return TopicBuilder.name("ai_analysis")
+        return TopicBuilder.name(KafkaTopics.AI_ANALYSIS)
                 .partitions(PARTITIONS)
                 .replicas(REPLICAS)
                 .build();
@@ -45,7 +45,7 @@ public class TopicInitializerConfig {
 
     @Bean
     public NewTopic alertsTopic() {
-        return TopicBuilder.name("alerts")
+        return TopicBuilder.name(KafkaTopics.ALERTS)
                 .partitions(PARTITIONS)
                 .replicas(REPLICAS)
                 .build();
