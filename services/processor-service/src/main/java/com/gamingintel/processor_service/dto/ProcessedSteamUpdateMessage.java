@@ -1,21 +1,19 @@
 package com.gamingintel.processor_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Getter
-@Setter
 @NoArgsConstructor
-public class SteamUpdateMessage {
+@AllArgsConstructor
+@Builder
+public class ProcessedSteamUpdateMessage {
 
-    @NotBlank
     private String gid;
 
-    @NotNull
     @JsonProperty("app_id")
     private Integer appId;
 
@@ -27,8 +25,11 @@ public class SteamUpdateMessage {
 
     private String contents;
 
-    private Long date;
+    @JsonProperty("event_time")
+    private String eventTime;
 
-    @JsonProperty("published_at")
-    private String publishedAt;
+    @JsonProperty("processed_at")
+    private String processedAt;
+
+    private String source;
 }
