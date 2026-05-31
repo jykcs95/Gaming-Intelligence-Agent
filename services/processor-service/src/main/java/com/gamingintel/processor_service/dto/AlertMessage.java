@@ -5,25 +5,31 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AiAnalysisMessage {
+public class AlertMessage {
+
+    private String alertId;
 
     private String gid;
 
-    private String summary;
+    private String severity;
+
+    private Integer importanceScore;
 
     private String sentiment;
 
     private Double confidence;
 
-    private Integer importanceScore;
-
     private String updateType;
 
-    private String keyPoints;
+    private String summary;
+
+    private List<String> triggeredRules;
 
     private String createdAt;
 
