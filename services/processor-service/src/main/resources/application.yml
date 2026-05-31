@@ -29,8 +29,9 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: com.gamingintel.processor_service.dto
-        spring.json.value.default.type: com.gamingintel.processor_service.dto.SteamUpdateMessage
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: com.gamingintel.processor_service.dto,com.gamingintel.processor_service.entity
 
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -41,7 +42,9 @@ spring:
       properties:
         enable.idempotence: true
         max.in.flight.requests.per.connection: 5
-
+    ollama:
+      base-url: http://[::1]:11434
+      model: llama3.2:latest
 server:
   port: 8080
 

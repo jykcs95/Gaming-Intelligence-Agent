@@ -23,9 +23,15 @@ public class KafkaRetryDlqConfig {
 
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 kafkaTemplate,
-                (consumerRecord, exception) -> new TopicPartition(
-                        KafkaTopics.RAW_UPDATES_DLQ,
-                        consumerRecord.partition()));
+                (consumerRecord, exception) -> {
+                    String dlqTopic = switch (consumerRecord.topic()) {
+                        case KafkaTopics.RAW_UPDATES -> KafkaTopics.RAW_UPDATES_DLQ;
+                        case KafkaTopics.PROCESSED_UPDATES -> KafkaTopics.PROCESSED_UPDATES_DLQ;
+                        default -> consumerRecord.topic() + "_dlq";
+                    };
+
+                    return new TopicPartition(dlqTopic, consumerRecord.partition());
+                });
 
         FixedBackOff fixedBackOff = new FixedBackOff(RETRY_INTERVAL_MS, MAX_RETRY_ATTEMPTS);
 

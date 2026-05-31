@@ -25,7 +25,9 @@ public class SteamUpdateConsumer {
         this.processedUpdateProducer = processedUpdateProducer;
     }
 
-    @KafkaListener(topics = KafkaTopics.RAW_UPDATES, groupId = "processor-service", containerFactory = "kafkaListenerContainerFactory")
+    @KafkaListener(topics = KafkaTopics.RAW_UPDATES, groupId = "processor-service", containerFactory = "kafkaListenerContainerFactory", properties = {
+            "spring.json.value.default.type=com.gamingintel.processor_service.dto.SteamUpdateMessage"
+    })
     public void consume(SteamUpdateMessage message) {
         log.info("Received Steam update message: gid={}, appId={}, title={}",
                 message.getGid(),

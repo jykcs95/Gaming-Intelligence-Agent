@@ -36,6 +36,14 @@ public class TopicInitializerConfig {
     }
 
     @Bean
+    public NewTopic processedUpdatesDlqTopic() {
+        return TopicBuilder.name(KafkaTopics.PROCESSED_UPDATES_DLQ)
+                .partitions(PARTITIONS)
+                .replicas(REPLICAS)
+                .build();
+    }
+
+    @Bean
     public NewTopic aiAnalysisTopic() {
         return TopicBuilder.name(KafkaTopics.AI_ANALYSIS)
                 .partitions(PARTITIONS)
