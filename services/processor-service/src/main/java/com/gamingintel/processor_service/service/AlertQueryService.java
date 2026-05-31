@@ -2,6 +2,7 @@ package com.gamingintel.processor_service.service;
 
 import com.gamingintel.processor_service.dto.AlertResponse;
 import com.gamingintel.processor_service.entity.AlertEntity;
+import com.gamingintel.processor_service.exception.AlertNotFoundException;
 import com.gamingintel.processor_service.repository.AlertRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.PageRequest;
@@ -28,7 +29,7 @@ public class AlertQueryService {
     public AlertResponse getAlertByGid(String gid) {
         return alertRepository.findByGid(gid)
                 .map(this::toResponse)
-                .orElseThrow(() -> new IllegalArgumentException("Alert not found for gid: " + gid));
+                .orElseThrow(() -> new AlertNotFoundException(gid));
     }
 
     public List<AlertResponse> getAlertsBySeverity(String severity) {

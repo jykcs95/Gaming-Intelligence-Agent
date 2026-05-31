@@ -31,10 +31,6 @@ public class AlertController {
 
     @GetMapping("/{gid}")
     public ResponseEntity<AlertResponse> getAlertByGid(@PathVariable String gid) {
-        try {
-            return ResponseEntity.ok(alertQueryService.getAlertByGid(gid));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(alertQueryService.getAlertByGid(gid));
     }
 }
