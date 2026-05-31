@@ -12,8 +12,7 @@ public class SteamEventService {
 
     private final SteamEventRepository steamEventRepository;
 
-    public SteamEventService(
-            SteamEventRepository steamEventRepository) {
+    public SteamEventService(SteamEventRepository steamEventRepository) {
         this.steamEventRepository = steamEventRepository;
     }
 
@@ -24,12 +23,14 @@ public class SteamEventService {
             String title,
             Instant eventTime,
             String rawPayload) {
-        SteamEventEntity event = new SteamEventEntity(
-                gid,
-                appId,
-                title,
-                eventTime,
-                rawPayload);
+
+        SteamEventEntity event = SteamEventEntity.builder()
+                .gid(gid)
+                .appId(appId)
+                .title(title)
+                .eventTime(eventTime)
+                .rawPayload(rawPayload)
+                .build();
 
         return steamEventRepository.save(event);
     }
