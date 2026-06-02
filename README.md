@@ -359,6 +359,36 @@ docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
 
 ---
 
+## Local Run Scripts
+
+From the project root:
+
+```powershell
+.\scripts\start-infra.ps1
+
+Start the Spring Boot processor:
+
+.\scripts\run-processor-service.ps1
+
+Start the Steam ingestion service:
+
+.\scripts\run-steam-ingestion.ps1
+
+Start the Discord alert consumer:
+
+.\scripts\run-discord-alert-consumer.ps1
+
+Stop infrastructure:
+
+.\scripts\stop-infra.ps1
+
+If PowerShell blocks script execution for the current terminal session:
+
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+---
+
 ## Running Tests
 
 From `services/processor-service`:
@@ -371,6 +401,40 @@ On Windows PowerShell:
 
 ```powershell
 .\mvnw.cmd test
+```
+
+---
+
+## Test the scripts
+
+Open separate PowerShell windows for long-running services.
+
+Terminal 1:
+
+```powershell
+cd ..\gaming-intelligence-agent
+.\scripts\start-infra.ps1
+
+Terminal 2:
+
+cd ..\gaming-intelligence-agent
+.\scripts\run-processor-service.ps1
+
+Terminal 3:
+
+cd ..\gaming-intelligence-agent
+.\scripts\run-discord-alert-consumer.ps1
+
+Terminal 4:
+
+cd ..\gaming-intelligence-agent
+.\scripts\run-steam-ingestion.ps1
+
+Then test full pipeline with a new gid:
+
+docker exec -it kafka /opt/kafka/bin/kafka-console-producer.sh `
+  --bootstrap-server kafka:9092 `
+  --topic raw_updates
 ```
 
 ---
