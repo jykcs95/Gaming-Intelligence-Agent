@@ -14,3 +14,7 @@ scrape_configs:
   - job_name: "steam-ingestion"
     static_configs:
       - targets: ["host.docker.internal:8000"]
+
+  - job_name: "discord-alert-consumer"
+    static_configs:
+      - targets: ["host.docker.internal:8001"]
