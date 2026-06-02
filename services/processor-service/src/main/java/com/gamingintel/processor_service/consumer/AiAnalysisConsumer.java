@@ -6,6 +6,8 @@ import com.gamingintel.processor_service.dto.AlertMessage;
 import com.gamingintel.processor_service.producer.AlertProducer;
 import com.gamingintel.processor_service.service.AlertPersistenceService;
 import com.gamingintel.processor_service.service.AlertRuleService;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -20,10 +22,36 @@ public class AiAnalysisConsumer {
         private final AlertPersistenceService alertPersistenceService;
         private final AlertProducer alertProducer;
 
+        private final Counter aiAnalysisMessagesConsumedCounter;
+        private final Counter alertsCreatedCounter;
+        private final Counter alertsSkippedCounter;
+        private final Counter alertsPublishedCounter;
+        private final Counter alertGenerationFailureCounter;
+
         public AiAnalysisConsumer(
                         AlertRuleService alertRuleService,
                         AlertPersistenceService alertPersistenceService,
-                        AlertProducer alertProducer) {
+                        AlertProducer alertProducer,
+                        MeterRegistry meterRegistry) {
+                this.aiAnalysisMessagesConsumedCounter = Counter.builder("ai_analysis_messages_consumed")
+                                .description("Total AI analysis messages consumed for alert generation")
+                                .register(meterRegistry);
+
+                this.alertsCreatedCounter = Counter.builder("alerts_created")
+                                .description("Total alerts created by alert rules")
+                                .register(meterRegistry);
+
+                this.alertsSkippedCounter = Counter.builder("alerts_skipped")
+                                .description("Total AI analysis messages that did not trigger alerts")
+                                .register(meterRegistry);
+
+                this.alertsPublishedCounter = Counter.builder("alerts_published")
+                                .description("Total alerts published to Kafka")
+                                .register(meterRegistry);
+
+                this.alertGenerationFailureCounter = Counter.builder("alert_generation_failure")
+                                .description("Total alert generation failures")
+                                .register(meterRegistry);
                 this.alertRuleService = alertRuleService;
                 this.alertPersistenceService = alertPersistenceService;
                 this.alertProducer = alertProducer;
@@ -33,41 +61,37 @@ public class AiAnalysisConsumer {
                         "spring.json.value.default.type=com.gamingintel.processor_service.dto.AiAnalysisMessage"
         })
         public void consume(AiAnalysisMessage message) {
-                log.info(
-                                "AI_ANALYSIS_CONSUMER_RECEIVED gid={} updateType={} importanceScore={} sentiment={} confidence={}",
-                                message.getGid(),
-                                message.getUpdateType(),
-                                message.getImportanceScore(),
-                                message.getSentiment(),
-                                message.getConfidence());
+                aiAnalysisMessagesConsumedCounter.increment();
 
-                AlertMessage alertMessage = alertRuleService.evaluate(message);
+                log.info("Received AI analysis for alert evaluation. gid={}", message.getGid());
 
-                if (alertMessage == null) {
+                try {
+                        AlertMessage alertMessage = alertRuleService.evaluate(message);
+
+                        if (alertMessage == null) {
+                                alertsSkippedCounter.increment();
+                                log.info("No alert generated for gid={}", message.getGid());
+                                return;
+                        }
+
+                        alertsCreatedCounter.increment();
+
+                        alertPersistenceService.save(alertMessage);
+
+                        alertProducer.publish(alertMessage);
+
+                        alertsPublishedCounter.increment();
+
                         log.info(
-                                        "ALERT_RULE_RESULT_NO_ALERT gid={} updateType={} importanceScore={} sentiment={} confidence={}",
-                                        message.getGid(),
-                                        message.getUpdateType(),
-                                        message.getImportanceScore(),
-                                        message.getSentiment(),
-                                        message.getConfidence());
-                        return;
+                                        "Alert generated, persisted, and published. gid={}, severity={}",
+                                        alertMessage.getGid(),
+                                        alertMessage.getSeverity());
+                } catch (Exception ex) {
+                        alertGenerationFailureCounter.increment();
+
+                        throw new IllegalStateException(
+                                        "Failed alert generation for gid=" + message.getGid(),
+                                        ex);
                 }
-
-                log.info(
-                                "ALERT_RULE_RESULT_CREATED gid={} alertId={} severity={} rules={}",
-                                alertMessage.getGid(),
-                                alertMessage.getAlertId(),
-                                alertMessage.getSeverity(),
-                                alertMessage.getTriggeredRules());
-
-                alertPersistenceService.save(alertMessage);
-
-                log.info(
-                                "ALERT_PERSISTENCE_CALL_COMPLETED gid={} alertId={}",
-                                alertMessage.getGid(),
-                                alertMessage.getAlertId());
-
-                alertProducer.publish(alertMessage);
         }
 }
