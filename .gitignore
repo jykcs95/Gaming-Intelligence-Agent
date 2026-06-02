@@ -5,3 +5,11 @@ target/
 .idea/
 .vscode/
 .DS_Store
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Steam ingestion local state
+services/steam-ingestion/.steam_ingestion_seen_gids.json
