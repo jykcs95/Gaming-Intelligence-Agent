@@ -6,6 +6,9 @@ import lombok.Data;
 import java.time.Instant;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Data
 @Builder
 public class AlertResponse {
@@ -26,6 +29,8 @@ public class AlertResponse {
 
     private String summary;
 
+    @JsonProperty("triggeredRules")
+    @JsonAlias("triggered_rules")
     private List<String> triggeredRules;
 
     private String source;

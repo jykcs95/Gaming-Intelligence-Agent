@@ -1,9 +1,15 @@
 package com.gamingintel.processor_service.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.Instant;
+import java.util.List;
 
 @Data
 @Builder
@@ -19,13 +25,21 @@ public class AiAnalysisMessage {
 
     private Double confidence;
 
+    @JsonProperty("importanceScore")
+    @JsonAlias("importance_score")
     private Integer importanceScore;
 
+    @JsonProperty("updateType")
+    @JsonAlias("update_type")
     private String updateType;
 
-    private String keyPoints;
+    @JsonProperty("keyPoints")
+    @JsonAlias("key_points")
+    private List<String> keyPoints;
 
-    private String createdAt;
+    @JsonProperty("createdAt")
+    @JsonAlias("created_at")
+    private Instant createdAt;
 
     private String source;
 }

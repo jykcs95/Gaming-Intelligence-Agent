@@ -4,6 +4,9 @@ import com.gamingintel.processor_service.dto.AiAnalysisMessage;
 import com.gamingintel.processor_service.dto.AlertMessage;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AlertRuleServiceTest {
@@ -127,8 +130,8 @@ class AlertRuleServiceTest {
         return AiAnalysisMessage.builder()
                 .gid("test-gid")
                 .summary("Test summary")
-                .keyPoints("Point 1; Point 2")
-                .createdAt("2026-05-31T18:00:00Z")
+                .keyPoints(List.of("Point 1", "Point 2"))
+                .createdAt(Instant.parse("2026-05-31T18:00:00Z"))
                 .source("ai-analysis-service");
     }
 }

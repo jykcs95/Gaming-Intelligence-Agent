@@ -7,6 +7,9 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -29,6 +32,8 @@ public class AlertMessage {
 
     private String summary;
 
+    @JsonProperty("triggeredRules")
+    @JsonAlias("triggered_rules")
     private List<String> triggeredRules;
 
     private String createdAt;

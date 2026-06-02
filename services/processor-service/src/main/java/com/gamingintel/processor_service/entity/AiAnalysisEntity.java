@@ -14,6 +14,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.List;
 
 @Entity
 @Table(name = "ai_analysis")
@@ -48,7 +49,7 @@ public class AiAnalysisEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "key_points", columnDefinition = "jsonb")
-    private String keyPoints;
+    private List<String> keyPoints;
 
     @Column(name = "created_at")
     private Instant createdAt;

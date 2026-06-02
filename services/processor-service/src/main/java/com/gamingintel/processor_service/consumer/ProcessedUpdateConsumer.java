@@ -41,7 +41,7 @@ public class ProcessedUpdateConsumer {
                                 .register(meterRegistry);
         }
 
-        @KafkaListener(topics = KafkaTopics.PROCESSED_UPDATES, groupId = "ai-analysis-service", properties = {
+        @KafkaListener(topics = KafkaTopics.PROCESSED_UPDATES, groupId = "ai-analysis-service", autoStartup = "${app.ai.spring-consumer-enabled:true}", properties = {
                         "spring.json.value.default.type=com.gamingintel.processor_service.dto.ProcessedSteamUpdateMessage"
         })
         public void consume(ProcessedSteamUpdateMessage message) {

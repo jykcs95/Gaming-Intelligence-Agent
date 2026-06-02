@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -50,7 +52,7 @@ public class AiAnalysisService {
                 .confidence(getDouble(analysis, "confidence", 0.5))
                 .importanceScore(getInteger(analysis, "importance_score", 1))
                 .updateType(getText(analysis, "update_type", "unknown"))
-                .keyPoints(toJsonString(analysis.get("key_points")))
+                .keyPoints(getStringList(analysis, "key_points"))
                 .createdAt(createdAt)
                 .build();
 
@@ -66,7 +68,7 @@ public class AiAnalysisService {
                 .importanceScore(saved.getImportanceScore())
                 .updateType(saved.getUpdateType())
                 .keyPoints(saved.getKeyPoints())
-                .createdAt(saved.getCreatedAt().toString())
+                .createdAt(saved.getCreatedAt())
                 .source(SOURCE)
                 .build();
     }
@@ -121,15 +123,29 @@ public class AiAnalysisService {
         return result;
     }
 
-    private String toJsonString(JsonNode node) {
-        try {
-            if (node == null || node.isNull()) {
-                return "[]";
+    private List<String> getStringList(JsonNode node, String fieldName) {
+        JsonNode value = node.get(fieldName);
+
+        if (value == null || value.isNull()) {
+            return List.of();
+        }
+
+        if (value.isArray()) {
+            List<String> result = new ArrayList<>();
+
+            for (JsonNode item : value) {
+                if (item != null && !item.isNull()) {
+                    result.add(item.asText());
+                }
             }
 
-            return objectMapper.writeValueAsString(node);
-        } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to serialize key_points", ex);
+            return result;
         }
+
+        if (value.isTextual()) {
+            return List.of(value.asText());
+        }
+
+        return List.of(value.toString());
     }
 }
