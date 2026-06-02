@@ -95,6 +95,11 @@ services:
     depends_on:
       - prometheus
 
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ../monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ../monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/json
   ########################################
   # OLLAMA (LOCAL AI)
   ########################################
@@ -111,3 +116,4 @@ services:
 volumes:
   postgres_data:
   ollama_data:
+  grafana_data:
