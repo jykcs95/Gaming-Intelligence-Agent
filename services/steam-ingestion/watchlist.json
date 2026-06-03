@@ -1,0 +1,32 @@
+{
+  "games": [
+    {
+      "app_id": 730,
+      "name": "Counter-Strike 2",
+      "enabled": true,
+      "alert_keywords": [
+        "security",
+        "exploit",
+        "cheat",
+        "matchmaking",
+        "ranked",
+        "weapon",
+        "recoil",
+        "balance"
+      ]
+    },
+    {
+      "app_id": 570,
+      "name": "Dota 2",
+      "enabled": true,
+      "alert_keywords": [
+        "hero",
+        "balance",
+        "ranked",
+        "matchmaking",
+        "exploit",
+        "patch"
+      ]
+    }
+  ]
+}

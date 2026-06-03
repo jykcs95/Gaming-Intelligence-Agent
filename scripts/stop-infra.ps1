@@ -1,11 +1,11 @@
 $ErrorActionPreference = "Stop"
 
-Write-Host "Starting Docker infrastructure..." -ForegroundColor Green
+Write-Host "Stoping Docker infrastructure..." -ForegroundColor Green
 
-$InfraPath = Join-Path $PSScriptRoot "..\infrastructure"
+$InfraPath = Join-Path $PSScriptRoot "..\infrastructure\docker"
 Set-Location $InfraPath
 
-docker compose up -d
+docker down
 
 Write-Host ""
 Write-Host "Infrastructure status:" -ForegroundColor Cyan
