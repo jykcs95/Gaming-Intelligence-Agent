@@ -19,6 +19,7 @@ This project demonstrates backend engineering, distributed systems, event-driven
 - Grafana dashboards
 - Swagger/OpenAPI documentation
 - Discord live alert delivery
+- Semantic alert search using Ollama embeddings and PostgreSQL pgvector
 
 ---
 
@@ -157,11 +158,12 @@ curl http://localhost:8080/api/alerts/portfolio-final-demo-001
 - `GET /api/alerts/summary`
 - `GET /api/alerts/high-priority`
 
-Swagger UI:
+## Semantic Search APIs
 
-```text
-http://localhost:8080/swagger-ui/index.html
-```
+- `POST /api/search/alerts/rebuild-index`
+- `GET /api/search/alerts?query=security%20exploit%20matchmaking&limit=5`
+
+The semantic search index embeds alert summaries and metadata using a local Ollama embedding model, stores vectors in PostgreSQL with pgvector, and ranks alerts by cosine similarity.
 
 ---
 
@@ -177,6 +179,12 @@ Grafana:
 
 ```text
 http://localhost:3000
+```
+
+Swagger UI:
+
+```text
+http://localhost:8080/swagger-ui/index.html
 ```
 
 Service metrics:
@@ -243,7 +251,6 @@ Add automated integration tests
 Add CI workflow
 Add Dockerfiles for Python services
 Add docker-compose profiles for local demo modes
-Add semantic search APIs using embeddings and pgvector
 Add richer Grafana dashboards
 Add alert severity trend panels
 Add DLQ replay tooling
