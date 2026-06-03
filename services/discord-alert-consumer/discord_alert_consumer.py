@@ -5,7 +5,7 @@ import signal
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Set
+from typing import Any, Dict, List, Set
 
 import requests
 from dotenv import load_dotenv
@@ -18,6 +18,8 @@ from prometheus_client import Counter, Histogram, start_http_server
 # -----------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent.parent
+
 load_dotenv(BASE_DIR / ".env")
 
 
@@ -36,7 +38,22 @@ PROMETHEUS_PORT = int(os.getenv("PROMETHEUS_PORT", "8001"))
 HTTP_TIMEOUT_SECONDS = 15
 
 SENT_ALERTS_STATE_FILE = Path(
-    os.getenv("SENT_ALERTS_STATE_FILE", BASE_DIR / ".discord_sent_alerts.json")
+    os.getenv("SENT_ALERTS_STATE_FILE", str(BASE_DIR / ".discord_sent_alerts.json"))
+)
+
+WATCHLIST_FILE = Path(
+    os.getenv(
+        "WATCHLIST_FILE",
+        str(PROJECT_ROOT / "services" / "steam-ingestion" / "watchlist.json"),
+    )
+)
+
+ENABLE_PERSONALIZED_FILTERING = (
+    os.getenv("ENABLE_PERSONALIZED_FILTERING", "true").lower() == "true"
+)
+
+ALWAYS_SEND_SECURITY_OR_CRITICAL = (
+    os.getenv("ALWAYS_SEND_SECURITY_OR_CRITICAL", "true").lower() == "true"
 )
 
 
@@ -63,6 +80,11 @@ discord_alert_messages_consumed_total = Counter(
 discord_alert_duplicates_skipped_total = Counter(
     "discord_alert_duplicates_skipped_total",
     "Total number of duplicate Discord alerts skipped",
+)
+
+discord_alert_personalized_filter_skipped_total = Counter(
+    "discord_alert_personalized_filter_skipped_total",
+    "Total number of Discord alerts skipped by personalized keyword filtering",
 )
 
 discord_alert_send_success_total = Counter(
@@ -115,11 +137,14 @@ def load_sent_alert_keys() -> Set[str]:
         with SENT_ALERTS_STATE_FILE.open("r", encoding="utf-8") as file:
             data = json.load(file)
 
-        if not isinstance(data, list):
-            logger.warning("Sent alerts state file is not a list. Ignoring existing state.")
-            return set()
+        if isinstance(data, list):
+            return {str(item) for item in data}
 
-        return set(str(item) for item in data)
+        if isinstance(data, dict) and isinstance(data.get("sent_alert_keys"), list):
+            return {str(item) for item in data["sent_alert_keys"]}
+
+        logger.warning("Sent alerts state file has unexpected format. Ignoring existing state.")
+        return set()
 
     except Exception as exc:
         logger.warning("Could not load sent alerts state file %s: %s", SENT_ALERTS_STATE_FILE, exc)
@@ -128,11 +153,142 @@ def load_sent_alert_keys() -> Set[str]:
 
 def save_sent_alert_keys(sent_alert_keys: Set[str]) -> None:
     try:
-        with SENT_ALERTS_STATE_FILE.open("w", encoding="utf-8") as file:
-            json.dump(sorted(sent_alert_keys), file, indent=2)
+        SENT_ALERTS_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+        temp_file = SENT_ALERTS_STATE_FILE.with_suffix(".tmp")
+        payload = {
+            "sent_alert_keys": sorted(sent_alert_keys),
+            "updated_at_epoch_seconds": int(time.time()),
+        }
+
+        with temp_file.open("w", encoding="utf-8") as file:
+            json.dump(payload, file, indent=2)
+
+        temp_file.replace(SENT_ALERTS_STATE_FILE)
+
     except Exception as exc:
         logger.warning("Could not save sent alerts state file %s: %s", SENT_ALERTS_STATE_FILE, exc)
 
+
+# -----------------------------
+# Watchlist / Personalized Filtering Helpers
+# -----------------------------
+
+def load_watchlist_keywords() -> Dict[int, List[str]]:
+    if not WATCHLIST_FILE.exists():
+        logger.warning("Watchlist file not found: %s", WATCHLIST_FILE)
+        return {}
+
+    try:
+        with WATCHLIST_FILE.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        games = data.get("games", [])
+        keywords_by_app_id: Dict[int, List[str]] = {}
+
+        for game in games:
+            if not game.get("enabled", True):
+                continue
+
+            app_id = game.get("app_id")
+            keywords = game.get("alert_keywords", [])
+
+            if app_id is None:
+                continue
+
+            keywords_by_app_id[int(app_id)] = [
+                str(keyword).strip().lower()
+                for keyword in keywords
+                if str(keyword).strip()
+            ]
+
+        return keywords_by_app_id
+
+    except Exception as exc:
+        discord_alert_consumer_errors_total.inc()
+        logger.warning("Could not load watchlist file %s: %s", WATCHLIST_FILE, exc)
+        return {}
+
+
+def normalize_list(value: Any) -> List[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(item).strip().lower() for item in value if str(item).strip()]
+
+    if isinstance(value, str):
+        return [value.strip().lower()] if value.strip() else []
+
+    normalized = str(value).strip().lower()
+    return [normalized] if normalized else []
+
+
+def alert_search_text(alert: Dict[str, Any]) -> str:
+    key_points = alert.get("key_points", [])
+    key_points_text = " ".join(normalize_list(key_points))
+
+    parts = [
+        str(alert.get("summary", "")),
+        str(alert.get("sentiment", "")),
+        str(alert.get("update_type", "")),
+        key_points_text,
+        str(alert.get("source", "")),
+    ]
+
+    return " ".join(parts).lower()
+
+
+def is_security_or_critical(alert: Dict[str, Any]) -> bool:
+    severity = str(alert.get("severity", "")).lower()
+    update_type = str(alert.get("update_type", "")).lower()
+    key_points = normalize_list(alert.get("key_points", []))
+
+    return (
+        severity == "critical"
+        or update_type == "security"
+        or "security_update" in key_points
+    )
+
+
+def matches_personal_keywords(
+    alert: Dict[str, Any],
+    keywords_by_app_id: Dict[int, List[str]],
+) -> bool:
+    app_id = alert.get("app_id")
+
+    try:
+        app_id = int(app_id) if app_id is not None else None
+    except ValueError:
+        app_id = None
+
+    watchlist_keywords = keywords_by_app_id.get(app_id, []) if app_id is not None else []
+
+    if not watchlist_keywords:
+        logger.info(
+            "No personalized keywords found for app_id=%s. Allowing alert.",
+            app_id,
+        )
+        return True
+
+    search_text = alert_search_text(alert)
+
+    for keyword in watchlist_keywords:
+        if keyword in search_text:
+            logger.info("Alert matched personalized keyword=%s", keyword)
+            return True
+
+    logger.info(
+        "Alert did not match personalized keywords app_id=%s keywords=%s",
+        app_id,
+        watchlist_keywords,
+    )
+    return False
+
+
+# -----------------------------
+# Alert Helpers
+# -----------------------------
 
 def get_value(alert: Dict[str, Any], camel_case_key: str, snake_case_key: str, default: Any = None) -> Any:
     """
@@ -198,18 +354,41 @@ def severity_icon(severity: str) -> str:
     return "ℹ️"
 
 
-def should_send_to_discord(alert: Dict[str, Any]) -> bool:
-    """
-    Only send useful alerts to Discord.
-
-    Current behavior:
-    - critical: send
-    - high: send
-    - medium: send
-    - low/unknown: skip
-    """
+def should_send_to_discord(
+    alert: Dict[str, Any],
+    keywords_by_app_id: Dict[int, List[str]],
+) -> bool:
     severity = str(alert.get("severity", "")).lower()
-    return severity in {"critical", "high", "medium"}
+
+    if severity not in {"critical", "high", "medium"}:
+        logger.info(
+            "Skipping Discord send for gid=%s severity=%s",
+            alert["gid"],
+            severity,
+        )
+        return False
+
+    if not ENABLE_PERSONALIZED_FILTERING:
+        return True
+
+    if ALWAYS_SEND_SECURITY_OR_CRITICAL and is_security_or_critical(alert):
+        logger.info(
+            "Alert is security/critical. Bypassing personalized keyword filter gid=%s",
+            alert["gid"],
+        )
+        return True
+
+    if matches_personal_keywords(alert, keywords_by_app_id):
+        return True
+
+    discord_alert_personalized_filter_skipped_total.inc()
+    logger.info(
+        "Skipping Discord send because alert did not match personalized keywords gid=%s app_id=%s game=%s",
+        alert["gid"],
+        alert["app_id"],
+        alert["game_name"],
+    )
+    return False
 
 
 def build_discord_payload(alert: Dict[str, Any]) -> Dict[str, Any]:
@@ -273,6 +452,10 @@ def send_to_discord(alert: Dict[str, Any]) -> None:
     discord_alert_send_success_total.inc()
 
 
+# -----------------------------
+# Kafka
+# -----------------------------
+
 def create_consumer() -> KafkaConsumer:
     logger.info("Connecting to Kafka bootstrap servers: %s", KAFKA_BOOTSTRAP_SERVERS)
     logger.info("Consuming topic: %s", ALERTS_TOPIC)
@@ -289,7 +472,11 @@ def create_consumer() -> KafkaConsumer:
     )
 
 
-def handle_alert_message(raw_alert: Dict[str, Any], sent_alert_keys: Set[str]) -> None:
+def handle_alert_message(
+    raw_alert: Dict[str, Any],
+    sent_alert_keys: Set[str],
+    keywords_by_app_id: Dict[int, List[str]],
+) -> None:
     logger.info("RAW ALERT RECEIVED: %s", json.dumps(raw_alert, indent=2))
 
     discord_alert_messages_consumed_total.inc()
@@ -315,12 +502,7 @@ def handle_alert_message(raw_alert: Dict[str, Any], sent_alert_keys: Set[str]) -
         alert["update_type"],
     )
 
-    if not should_send_to_discord(alert):
-        logger.info(
-            "Skipping Discord send for gid=%s severity=%s",
-            alert["gid"],
-            alert["severity"],
-        )
+    if not should_send_to_discord(alert, keywords_by_app_id):
         return
 
     send_to_discord(alert)
@@ -345,11 +527,17 @@ def main() -> int:
     logger.info("DRY_RUN: %s", DRY_RUN)
     logger.info("DISCORD_WEBHOOK_URL present: %s", bool(DISCORD_WEBHOOK_URL))
     logger.info("Sent alerts state file: %s", SENT_ALERTS_STATE_FILE)
+    logger.info("Watchlist file: %s", WATCHLIST_FILE)
+    logger.info("Personalized filtering enabled: %s", ENABLE_PERSONALIZED_FILTERING)
+    logger.info("Always send security/critical: %s", ALWAYS_SEND_SECURITY_OR_CRITICAL)
 
     start_http_server(PROMETHEUS_PORT)
 
     sent_alert_keys = load_sent_alert_keys()
+    keywords_by_app_id = load_watchlist_keywords()
+
     logger.info("Loaded %s previously sent Discord alert keys", len(sent_alert_keys))
+    logger.info("Loaded personalized keywords for %s games", len(keywords_by_app_id))
 
     consumer = create_consumer()
 
@@ -362,7 +550,11 @@ def main() -> int:
 
                 for message in messages:
                     try:
-                        handle_alert_message(message.value, sent_alert_keys)
+                        handle_alert_message(
+                            message.value,
+                            sent_alert_keys,
+                            keywords_by_app_id,
+                        )
                     except Exception as exc:
                         discord_alert_send_failure_total.inc()
                         discord_alert_consumer_errors_total.inc()
