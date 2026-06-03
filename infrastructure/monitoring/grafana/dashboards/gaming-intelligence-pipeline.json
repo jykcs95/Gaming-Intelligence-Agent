@@ -292,7 +292,7 @@
                       },
                       "spec": {
                         "editorMode": "builder",
-                        "expr": "ai_analysis_success_total",
+                        "expr": "python_ai_analysis_success_total",
                         "legendFormat": "__auto",
                         "range": true
                       }
@@ -313,7 +313,7 @@
                       },
                       "spec": {
                         "editorMode": "builder",
-                        "expr": "ai_analysis_failure_total",
+                        "expr": "python_ai_analysis_failure_total",
                         "instant": false,
                         "legendFormat": "__auto",
                         "range": true

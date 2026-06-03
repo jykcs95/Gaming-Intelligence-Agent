@@ -18,7 +18,7 @@
     {
       "app_id": 570,
       "name": "Dota 2",
-      "enabled": true,
+      "enabled": false,
       "alert_keywords": [
         "hero",
         "balance",
@@ -31,7 +31,7 @@
     {
       "app_id": 440,
       "name": "Team Fortress 2",
-      "enabled": true,
+      "enabled": false,
       "alert_keywords": [
         "security",
         "exploit",

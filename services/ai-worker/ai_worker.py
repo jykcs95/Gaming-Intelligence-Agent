@@ -36,7 +36,11 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip(
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:latest")
 
 PROMETHEUS_PORT = int(os.getenv("PROMETHEUS_PORT", "8002"))
-HTTP_TIMEOUT_SECONDS = 120
+
+OLLAMA_CONNECT_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_CONNECT_TIMEOUT_SECONDS", "5"))
+OLLAMA_READ_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_READ_TIMEOUT_SECONDS", "30"))
+KAFKA_SEND_TIMEOUT_SECONDS = int(os.getenv("KAFKA_SEND_TIMEOUT_SECONDS", "5"))
+KAFKA_CLOSE_TIMEOUT_SECONDS = int(os.getenv("KAFKA_CLOSE_TIMEOUT_SECONDS", "3"))
 
 
 # -----------------------------
@@ -259,6 +263,9 @@ def extract_json_object(raw_text: str) -> Dict[str, Any]:
 
 
 def call_ollama(prompt: str) -> str:
+    if not running:
+        raise RuntimeError("AI worker is shutting down before Ollama call.")
+
     url = f"{OLLAMA_BASE_URL}/api/generate"
 
     payload = {
@@ -267,18 +274,22 @@ def call_ollama(prompt: str) -> str:
         "stream": False,
         "format": "json",
         "options": {
-            "temperature": 0
-        }
+            "temperature": 0,
+            "num_predict": 350,
+        },
     }
 
     with llm_inference_latency_seconds.time():
-        response = requests.post(url, json=payload, timeout=HTTP_TIMEOUT_SECONDS)
+        response = requests.post(
+            url,
+            json=payload,
+            timeout=(OLLAMA_CONNECT_TIMEOUT_SECONDS, OLLAMA_READ_TIMEOUT_SECONDS),
+        )
 
     response.raise_for_status()
     data = response.json()
 
     return data.get("response", "")
-
 
 def to_kafka_ai_analysis_message(update: ProcessedSteamUpdate, analysis: AiAnalysisOutput) -> Dict[str, Any]:
     """
@@ -378,6 +389,9 @@ def create_producer() -> KafkaProducer:
 
 
 def publish_ai_analysis(producer: KafkaProducer, message: Dict[str, Any]) -> None:
+    if not running:
+        raise RuntimeError("AI worker is shutting down before Kafka publish.")
+
     gid = message["gid"]
 
     future = producer.send(
@@ -386,8 +400,8 @@ def publish_ai_analysis(producer: KafkaProducer, message: Dict[str, Any]) -> Non
         value=message,
     )
 
-    future.get(timeout=15)
-    producer.flush(timeout=15)
+    future.get(timeout=KAFKA_SEND_TIMEOUT_SECONDS)
+    producer.flush(timeout=KAFKA_SEND_TIMEOUT_SECONDS)
 
     ai_analysis_published_total.inc()
 
@@ -466,11 +480,19 @@ def main() -> int:
             time.sleep(0.1)
 
     finally:
-        consumer.close()
-        producer.close(timeout=15)
-        logger.info("Python LangGraph AI worker stopped")
+        logger.info("Closing Kafka consumer and producer...")
 
-    return 0
+        try:
+            consumer.close()
+        except Exception as exc:
+            logger.warning("Failed to close Kafka consumer cleanly: %s", exc)
+
+        try:
+            producer.close(timeout=KAFKA_CLOSE_TIMEOUT_SECONDS)
+        except Exception as exc:
+            logger.warning("Failed to close Kafka producer cleanly: %s", exc)
+
+        logger.info("Python LangGraph AI worker stopped")
 
 
 if __name__ == "__main__":
