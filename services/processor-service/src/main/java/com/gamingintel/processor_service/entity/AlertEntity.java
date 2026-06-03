@@ -62,4 +62,13 @@ public class AlertEntity {
 
     @Column(name = "created_at")
     private Instant createdAt;
+
+    @Column(name = "app_id")
+    private Integer appId;
+
+    @Column(name = "game_name")
+    private String gameName;
+
+    @Column(name = "url")
+    private String url;
 }

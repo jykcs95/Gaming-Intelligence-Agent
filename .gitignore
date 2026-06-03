@@ -13,3 +13,6 @@ __pycache__/
 
 # Steam ingestion local state
 services/steam-ingestion/.steam_ingestion_seen_gids.json
+
+# Discord consumer local state
+services/discord-alert-consumer/.discord_sent_alerts.json

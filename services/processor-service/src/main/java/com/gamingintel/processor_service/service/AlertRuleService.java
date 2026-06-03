@@ -63,6 +63,9 @@ public class AlertRuleService {
                 .triggeredRules(triggeredRules)
                 .createdAt(Instant.now().toString())
                 .source("alert-rule-service")
+                .appId(message.getAppId())
+                .gameName(message.getGameName())
+                .url(message.getUrl())
                 .build();
     }
 

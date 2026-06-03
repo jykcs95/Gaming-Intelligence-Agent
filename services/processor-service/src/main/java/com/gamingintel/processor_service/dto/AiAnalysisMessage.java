@@ -25,6 +25,16 @@ public class AiAnalysisMessage {
 
     private Double confidence;
 
+    @JsonProperty("appId")
+    @JsonAlias("app_id")
+    private Integer appId;
+
+    @JsonProperty("gameName")
+    @JsonAlias("game_name")
+    private String gameName;
+
+    private String url;
+
     @JsonProperty("importanceScore")
     @JsonAlias("importance_score")
     private Integer importanceScore;

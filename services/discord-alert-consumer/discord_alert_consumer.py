@@ -4,14 +4,23 @@ import os
 import signal
 import sys
 import time
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, Set
 
 import requests
 from dotenv import load_dotenv
 from kafka import KafkaConsumer
 from prometheus_client import Counter, Histogram, start_http_server
 
-load_dotenv()
+
+# -----------------------------
+# Env loading
+# -----------------------------
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+
+
 # -----------------------------
 # Configuration
 # -----------------------------
@@ -25,6 +34,10 @@ DRY_RUN = os.getenv("DRY_RUN", "true").lower() == "true"
 
 PROMETHEUS_PORT = int(os.getenv("PROMETHEUS_PORT", "8001"))
 HTTP_TIMEOUT_SECONDS = 15
+
+SENT_ALERTS_STATE_FILE = Path(
+    os.getenv("SENT_ALERTS_STATE_FILE", BASE_DIR / ".discord_sent_alerts.json")
+)
 
 
 # -----------------------------
@@ -45,6 +58,11 @@ logger = logging.getLogger(__name__)
 discord_alert_messages_consumed_total = Counter(
     "discord_alert_messages_consumed_total",
     "Total number of alert messages consumed from Kafka",
+)
+
+discord_alert_duplicates_skipped_total = Counter(
+    "discord_alert_duplicates_skipped_total",
+    "Total number of duplicate Discord alerts skipped",
 )
 
 discord_alert_send_success_total = Counter(
@@ -86,8 +104,35 @@ signal.signal(signal.SIGTERM, handle_shutdown)
 
 
 # -----------------------------
-# Helpers
+# State / Dedupe Helpers
 # -----------------------------
+
+def load_sent_alert_keys() -> Set[str]:
+    if not SENT_ALERTS_STATE_FILE.exists():
+        return set()
+
+    try:
+        with SENT_ALERTS_STATE_FILE.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        if not isinstance(data, list):
+            logger.warning("Sent alerts state file is not a list. Ignoring existing state.")
+            return set()
+
+        return set(str(item) for item in data)
+
+    except Exception as exc:
+        logger.warning("Could not load sent alerts state file %s: %s", SENT_ALERTS_STATE_FILE, exc)
+        return set()
+
+
+def save_sent_alert_keys(sent_alert_keys: Set[str]) -> None:
+    try:
+        with SENT_ALERTS_STATE_FILE.open("w", encoding="utf-8") as file:
+            json.dump(sorted(sent_alert_keys), file, indent=2)
+    except Exception as exc:
+        logger.warning("Could not save sent alerts state file %s: %s", SENT_ALERTS_STATE_FILE, exc)
+
 
 def get_value(alert: Dict[str, Any], camel_case_key: str, snake_case_key: str, default: Any = None) -> Any:
     """
@@ -109,6 +154,9 @@ def normalize_alert(alert: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "alert_id": get_value(alert, "alertId", "alert_id", "unknown-alert-id"),
         "gid": alert.get("gid", "unknown-gid"),
+        "app_id": get_value(alert, "appId", "app_id", None),
+        "game_name": get_value(alert, "gameName", "game_name", "Unknown Game"),
+        "url": alert.get("url", ""),
         "severity": str(alert.get("severity", "unknown")).lower(),
         "importance_score": get_value(alert, "importanceScore", "importance_score", 0),
         "sentiment": alert.get("sentiment", "unknown"),
@@ -119,6 +167,20 @@ def normalize_alert(alert: Dict[str, Any]) -> Dict[str, Any]:
         "source": alert.get("source", "unknown"),
         "created_at": get_value(alert, "createdAt", "created_at", "unknown"),
     }
+
+
+def alert_dedupe_key(alert: Dict[str, Any]) -> str:
+    """
+    Prefer alert_id when available.
+    Fallback to gid because your alert persistence is based around one alert per gid.
+    """
+    alert_id = str(alert.get("alert_id", "")).strip()
+    gid = str(alert.get("gid", "")).strip()
+
+    if alert_id and alert_id != "unknown-alert-id":
+        return f"alert_id:{alert_id}"
+
+    return f"gid:{gid}"
 
 
 def severity_icon(severity: str) -> str:
@@ -145,8 +207,6 @@ def should_send_to_discord(alert: Dict[str, Any]) -> bool:
     - high: send
     - medium: send
     - low/unknown: skip
-
-    You can tighten this later if Discord gets noisy.
     """
     severity = str(alert.get("severity", "")).lower()
     return severity in {"critical", "high", "medium"}
@@ -163,6 +223,7 @@ def build_discord_payload(alert: Dict[str, Any]) -> Dict[str, Any]:
 
     content = (
         f"{icon} **Gaming Intelligence Alert**\n\n"
+        f"**Game:** {alert['game_name']}\n"
         f"**Severity:** {alert['severity'].upper()}\n"
         f"**GID:** `{alert['gid']}`\n"
         f"**Update Type:** `{alert['update_type']}`\n"
@@ -171,6 +232,9 @@ def build_discord_payload(alert: Dict[str, Any]) -> Dict[str, Any]:
         f"**Confidence:** `{alert['confidence']}`\n\n"
         f"**Summary:**\n{alert['summary'] or 'No summary provided.'}\n"
     )
+
+    if alert.get("url"):
+        content += f"\n**Steam Update:** {alert['url']}\n"
 
     if key_points_text:
         content += f"\n**Key Points:**\n{key_points_text}\n"
@@ -202,6 +266,7 @@ def send_to_discord(alert: Dict[str, Any]) -> None:
             json=payload,
             timeout=HTTP_TIMEOUT_SECONDS,
         )
+
     logger.info("Discord webhook response status=%s body=%s", response.status_code, response.text)
 
     response.raise_for_status()
@@ -224,15 +289,28 @@ def create_consumer() -> KafkaConsumer:
     )
 
 
-def handle_alert_message(raw_alert: Dict[str, Any]) -> None:
+def handle_alert_message(raw_alert: Dict[str, Any], sent_alert_keys: Set[str]) -> None:
     logger.info("RAW ALERT RECEIVED: %s", json.dumps(raw_alert, indent=2))
+
     discord_alert_messages_consumed_total.inc()
 
     alert = normalize_alert(raw_alert)
+    dedupe_key = alert_dedupe_key(alert)
+
+    if dedupe_key in sent_alert_keys:
+        discord_alert_duplicates_skipped_total.inc()
+        logger.info(
+            "Skipping duplicate Discord alert dedupe_key=%s gid=%s severity=%s",
+            dedupe_key,
+            alert["gid"],
+            alert["severity"],
+        )
+        return
 
     logger.info(
-        "Consumed alert gid=%s severity=%s update_type=%s",
+        "Consumed alert gid=%s game=%s severity=%s update_type=%s",
         alert["gid"],
+        alert["game_name"],
         alert["severity"],
         alert["update_type"],
     )
@@ -247,9 +325,13 @@ def handle_alert_message(raw_alert: Dict[str, Any]) -> None:
 
     send_to_discord(alert)
 
+    sent_alert_keys.add(dedupe_key)
+    save_sent_alert_keys(sent_alert_keys)
+
     logger.info(
-        "Discord alert handled successfully gid=%s severity=%s",
+        "Discord alert handled successfully gid=%s game=%s severity=%s",
         alert["gid"],
+        alert["game_name"],
         alert["severity"],
     )
 
@@ -257,9 +339,17 @@ def handle_alert_message(raw_alert: Dict[str, Any]) -> None:
 def main() -> int:
     logger.info("Starting Discord alert consumer")
     logger.info("Prometheus metrics port: %s", PROMETHEUS_PORT)
+    logger.info("Kafka bootstrap servers: %s", KAFKA_BOOTSTRAP_SERVERS)
+    logger.info("Alerts topic: %s", ALERTS_TOPIC)
+    logger.info("Consumer group: %s", CONSUMER_GROUP_ID)
     logger.info("DRY_RUN: %s", DRY_RUN)
+    logger.info("DISCORD_WEBHOOK_URL present: %s", bool(DISCORD_WEBHOOK_URL))
+    logger.info("Sent alerts state file: %s", SENT_ALERTS_STATE_FILE)
 
     start_http_server(PROMETHEUS_PORT)
+
+    sent_alert_keys = load_sent_alert_keys()
+    logger.info("Loaded %s previously sent Discord alert keys", len(sent_alert_keys))
 
     consumer = create_consumer()
 
@@ -267,10 +357,12 @@ def main() -> int:
         while running:
             records = consumer.poll(timeout_ms=1000)
 
-            for _, messages in records.items():
+            for topic_partition, messages in records.items():
+                logger.info("Received %s records from %s", len(messages), topic_partition)
+
                 for message in messages:
                     try:
-                        handle_alert_message(message.value)
+                        handle_alert_message(message.value, sent_alert_keys)
                     except Exception as exc:
                         discord_alert_send_failure_total.inc()
                         discord_alert_consumer_errors_total.inc()

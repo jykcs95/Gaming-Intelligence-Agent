@@ -56,6 +56,8 @@ public class SteamUpdateProcessingService {
                 .url(message.getUrl())
                 .author(message.getAuthor())
                 .contents(message.getContents())
+                .gameName(message.getGameName())
+                .alertKeywords(message.getAlertKeywords())
                 .eventTime(eventTime.toString())
                 .processedAt(Instant.now().toString())
                 .source(SOURCE)

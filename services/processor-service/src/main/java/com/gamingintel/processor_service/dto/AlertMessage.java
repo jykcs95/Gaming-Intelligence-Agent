@@ -32,6 +32,16 @@ public class AlertMessage {
 
     private String summary;
 
+    @JsonProperty("appId")
+    @JsonAlias("app_id")
+    private Integer appId;
+
+    @JsonProperty("gameName")
+    @JsonAlias("game_name")
+    private String gameName;
+
+    private String url;
+
     @JsonProperty("triggeredRules")
     @JsonAlias("triggered_rules")
     private List<String> triggeredRules;

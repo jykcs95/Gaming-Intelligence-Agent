@@ -59,6 +59,9 @@ public class AlertPersistenceService {
                 .triggeredRules(alertMessage.getTriggeredRules())
                 .source(alertMessage.getSource())
                 .createdAt(parseCreatedAt(alertMessage.getCreatedAt()))
+                .appId(alertMessage.getAppId())
+                .gameName(alertMessage.getGameName())
+                .url(alertMessage.getUrl())
                 .build();
 
         AlertEntity saved = alertRepository.save(entity);

@@ -114,12 +114,14 @@ signal.signal(signal.SIGTERM, handle_shutdown)
 class ProcessedSteamUpdate(BaseModel):
     gid: str
     app_id: int = Field(default=730, alias="appId")
+    game_name: str = Field(default="Unknown Game", alias="gameName")
     title: str = ""
     url: str = ""
     author: str = ""
     contents: str = ""
     date: Optional[int] = None
     published_at: Optional[str] = Field(default=None, alias="publishedAt")
+    alert_keywords: List[str] = Field(default_factory=list, alias="alertKeywords")
 
     model_config = {
         "populate_by_name": True
@@ -221,12 +223,14 @@ Scoring rules:
 - Use other only if none fit.
 
 Steam update:
+game_name: {update.game_name}
 gid: {update.gid}
 app_id: {update.app_id}
 title: {update.title}
 author: {update.author}
 published_at: {update.published_at}
 url: {update.url}
+alert_keywords:{",".join(update.alert_keywords) if update.alert_keywords else "none"}
 
 contents:
 {update.contents}
@@ -282,6 +286,9 @@ def to_kafka_ai_analysis_message(update: ProcessedSteamUpdate, analysis: AiAnaly
     """
     return {
         "gid": update.gid,
+        "appId": update.app_id,
+        "gameName": update.game_name,
+        "url": update.url,
         "summary": analysis.summary,
         "sentiment": analysis.sentiment,
         "confidence": analysis.confidence,

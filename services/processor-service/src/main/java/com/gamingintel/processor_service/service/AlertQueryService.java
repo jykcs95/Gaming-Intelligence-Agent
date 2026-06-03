@@ -67,6 +67,9 @@ public class AlertQueryService {
                 .triggeredRules(entity.getTriggeredRules())
                 .source(entity.getSource())
                 .createdAt(entity.getCreatedAt())
+                .appId(entity.getAppId())
+                .gameName(entity.getGameName())
+                .url(entity.getUrl())
                 .build();
     }
 
