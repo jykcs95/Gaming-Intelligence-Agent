@@ -27,6 +27,22 @@
         "exploit",
         "patch"
       ]
+    },
+    {
+      "app_id": 440,
+      "name": "Team Fortress 2",
+      "enabled": true,
+      "alert_keywords": [
+        "security",
+        "exploit",
+        "cheat",
+        "matchmaking",
+        "ranked",
+        "balance",
+        "patch",
+        "bug",
+        "fix"
+      ]
     }
   ]
 }
