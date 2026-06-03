@@ -224,26 +224,26 @@ curl http://localhost:8080/actuator/prometheus
 
 Implemented:
 
-Docker Kafka infrastructure
-PostgreSQL + pgvector
-Spring Boot processor service
-Kafka topic initialization
-Kafka retry/DLQ configuration
-Raw update ingestion pipeline
-Idempotent processing ledger
-AI analysis persistence
-Alert generation
-Alert persistence
-Alert APIs
-Swagger/OpenAPI
-Prometheus metrics
-Grafana dashboard support
-Python Steam ingestion service
-Python Discord alert consumer
-Python LangGraph AI worker
-Pydantic AI output validation
-Local Ollama inference
-PowerShell run scripts
+- Docker Kafka infrastructure
+- PostgreSQL + pgvector
+- Spring Boot processor service
+- Kafka topic initialization
+- Kafka retry/DLQ configuration
+- Raw update ingestion pipeline
+- Idempotent processing ledger
+- AI analysis persistence
+- Alert generation
+- Alert persistence
+- Alert APIs
+- Swagger/OpenAPI
+- Prometheus metrics
+- Grafana dashboard support
+- Python Steam ingestion service
+- Python Discord alert consumer
+- Python LangGraph AI worker
+- Pydantic AI output validation
+- Local Ollama inference
+- PowerShell run scripts
 
 Future improvements:
 
@@ -251,6 +251,7 @@ Add automated integration tests
 Add CI workflow
 Add Dockerfiles for Python services
 Add docker-compose profiles for local demo modes
+Add semantic search APIs using embeddings and pgvector
 Add richer Grafana dashboards
 Add alert severity trend panels
 Add DLQ replay tooling
